@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .geo-btn {
+      background-color: transparent;
+      color: #EBEBEB;
+      border: 1px solid #3A3A3A;
+      padding: 10px 18px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      width: 100%;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+    .geo-btn:hover {
+      border-color: #B15258;
+      color: #FFFFFF;
+      background-color: rgba(177, 82, 88, 0.12);
+    }
+    .geo-btn:active {
+      transform: scale(0.99);
+    }
+    .geo-status {
+      font-size: 0.78rem;
+      color: #888888;
+      margin-top: 6px;
+      text-align: center;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+  <button type="button" class="geo-btn" id="detectBtn" name="detect_location" aria-label="Detect GPS coordinates" onclick="detectGPS()">
+    <span>📍</span> Detect My Location
+  </button>
+  <div id="statusMsg" class="geo-status" role="status" aria-live="polite"></div>
+
+  <script>
+    // Streamlit Component Protocol - Safe bidirectional communication without top-frame navigation
+    function sendValueToStreamlit(value) {
+      window.parent.postMessage({
+        type: "streamlit:setComponentValue",
+        value: value
+      }, "*");
+    }
+
+    function setFrameHeight(height) {
+      window.parent.postMessage({
+        type: "streamlit:setFrameHeight",
+        height: height
+      }, "*");
+    }
+
+    // Initialize frame height
+    window.addEventListener("load", function() {
+      setFrameHeight(65);
+    });
+
+    // Handle Streamlit state updates if sent to component
+    window.addEventListener("message", function(event) {
+      if (event.data && event.data.type === "streamlit:render") {
+        const args = event.data.args || {};
+        const btn = document.getElementById('detectBtn');
+        if (args.current_lat && args.current_lon) {
+          btn.innerHTML = "<span>📍</span> Detected (" + args.current_lat + ", " + args.current_lon + ")";
+        }
+      }
+    });
+
+    function detectGPS() {
+      const btn = document.getElementById('detectBtn');
+      const status = document.getElementById('statusMsg');
+
+      if (!navigator.geolocation) {
+        status.innerText = "Geolocation is not supported by your browser.";
+        status.style.color = "#C45D63";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Requesting GPS coordinates...";
+      status.innerText = "Waiting for browser permission...";
+      status.style.color = "#888888";
+
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          const lat = parseFloat(position.coords.latitude.toFixed(6));
+          const lon = parseFloat(position.coords.longitude.toFixed(6));
+
+          btn.disabled = false;
+          btn.innerHTML = "<span>📍</span> Detected (" + lat + ", " + lon + ")";
+          status.innerText = "Location detected: " + lat + ", " + lon;
+          status.style.color = "#10B981";
+
+          // Send coordinates directly to Streamlit Python backend via standard postMessage
+          sendValueToStreamlit({
+            latitude: lat,
+            longitude: lon,
+            status: "success"
+          });
+        },
+        function(error) {
+          btn.disabled = false;
+          btn.innerHTML = "<span>📍</span> Detect My Location";
+          let errText = "Unable to detect your location.";
+          if (error.code === error.PERMISSION_DENIED) {
+            errText = "Location permission denied. Please enter location manually.";
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            errText = "Location unavailable. Please enter location manually.";
+          } else if (error.code === error.TIMEOUT) {
+            errText = "Location request timed out. Please enter location manually.";
+          }
+          status.innerText = errText;
+          status.style.color = "#C45D63";
+
+          sendValueToStreamlit({
+            latitude: null,
+            longitude: null,
+            status: "error",
+            message: errText
+          });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    }
+  </script>
+</body>
+</html>
