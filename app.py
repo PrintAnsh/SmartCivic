@@ -331,9 +331,13 @@ Capture a photo, let AI classify and triage the problem, and verify location for
                             st.session_state["ai_recommended_action"] = ai_res.get("recommended_action")
                     except Exception as e:
                         st.session_state["ai_status"] = "error"
-                        st.session_state["ai_result"] = {"success": False, "error": str(e)}
+                        st.session_state["ai_result"] = {
+                            "success": False,
+                            "error": str(e),
+                            "message": "AI analysis is temporarily unavailable."
+                        }
 
-        # AI Breakdown Card
+        # AI Breakdown Card / Fallback State
         ai_res = st.session_state.get("ai_result")
         if ai_res and ai_res.get("success"):
             cat = ai_res.get("category")
@@ -360,6 +364,19 @@ Capture a photo, let AI classify and triage the problem, and verify location for
 <ul style="margin: 0 0 0.8rem 1.2rem; padding: 0; font-size: 0.82rem; color: #BBB;">{risks_html}</ul>
 <div class="ai-field-label">RECOMMENDED ACTION</div>
 <div style="font-size: 0.85rem; color: #10B981; line-height: 1.4;">{ai_res.get('recommended_action', 'N/A')}</div>
+</div>""",
+                unsafe_allow_html=True
+            )
+        elif ai_res and not ai_res.get("success"):
+            user_msg = ai_res.get("message", "AI analysis is temporarily unavailable.")
+            # Sanitize message to prevent leaking keys, internal codes or system traces
+            if any(term in str(user_msg).lower() for term in ["key", "secret", "traceback", "clienterror", "apiexception", "404", "503", "socket", "http"]):
+                user_msg = "AI multimodal vision service is temporarily unavailable."
+
+            st.markdown(
+                f"""<div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 0.85rem; margin-top: 1rem;">
+<div style="color: #FBBF24; font-weight: 600; font-size: 0.88rem; margin-bottom: 0.35rem;">⚠️ AI Triage Temporarily Unavailable</div>
+<div style="color: #CBD5E1; font-size: 0.82rem; line-height: 1.5;">{user_msg} Please select the issue category manually on the right and continue submitting your report.</div>
 </div>""",
                 unsafe_allow_html=True
             )

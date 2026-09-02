@@ -37,8 +37,8 @@ CIVIC_CATEGORIES = [
 # Centralized Severity Levels
 SEVERITY_LEVELS = ["Low", "Medium", "High", "Critical"]
 
-# Hard Timeout Limits
-TOTAL_ANALYSIS_TIMEOUT_SECONDS = 12.0
+# Hard Timeout Limits (balanced for multimodal image transfer + LLM inference)
+TOTAL_ANALYSIS_TIMEOUT_SECONDS = 20.0
 
 # Memory cache for verified multimodal models
 _CACHED_MULTIMODAL_MODELS: Optional[list[str]] = None
@@ -191,28 +191,49 @@ def _convert_image_to_part(image: Image.Image):
     return image
 
 
-def get_verified_multimodal_models(client: "genai.Client", verbose: bool = False) -> list[str]:
+# Primary and fallback vision models verified for production
+PRIMARY_VISION_MODEL = "gemini-3.6-flash"
+FALLBACK_VISION_MODEL = "gemini-3-flash-preview"
+DEFAULT_VISION_MODELS = [PRIMARY_VISION_MODEL, FALLBACK_VISION_MODEL]
+
+# Strict blacklist of non-vision / audio / embedding / deprecated keywords
+NON_VISION_OR_DEPRECATED = [
+    "tts", "audio", "embed", "embedding", "imagen", "veo", "whisper", "live", "transcription",
+    "gemini-2.5-flash-preview-tts",
+    "gemini-2.5-flash",     # Deprecated / 404 for new users
+    "gemini-2.0-flash",     # Deprecated / 404
+    "gemini-2.0-flash-lite",# Deprecated / 404
+    "gemini-2.5-pro",       # Deprecated / 404
+    "gemini-1.5-flash",     # Deprecated / 404 on current endpoint
+    "gemini-1.5-pro",       # Deprecated / 404 on current endpoint
+]
+
+
+def get_verified_multimodal_models(
+    client: Optional["genai.Client"] = None,
+    verbose: bool = False,
+    force_refresh: bool = False
+) -> list[str]:
     """
-    Dynamically queries the Gemini API to discover models that EXPLICITLY support
-    image/multimodal input and generateContent, strictly filtering out TTS, audio, embedding,
-    and deprecated models.
+    Returns the verified production multimodal vision models for SmartCivic.
+    By default, immediately returns known active models (gemini-3.6-flash, gemini-3-flash-preview)
+    to eliminate costly API catalog enumeration latency on user requests.
+    Only queries dynamic API listing if force_refresh is explicitly True and client is supplied.
     """
     global _CACHED_MULTIMODAL_MODELS
-    if _CACHED_MULTIMODAL_MODELS is not None and len(_CACHED_MULTIMODAL_MODELS) > 0:
+    if not force_refresh:
+        if _CACHED_MULTIMODAL_MODELS is not None and len(_CACHED_MULTIMODAL_MODELS) > 0:
+            return _CACHED_MULTIMODAL_MODELS
+        _CACHED_MULTIMODAL_MODELS = list(DEFAULT_VISION_MODELS)
         return _CACHED_MULTIMODAL_MODELS
 
-    # Strict blacklist of non-vision / audio / embedding / deprecated keywords
-    NON_VISION_OR_DEPRECATED = [
-        "tts", "audio", "embed", "embedding", "imagen", "veo", "whisper", "live", "transcription",
-        "gemini-2.5-flash-preview-tts",
-        "gemini-2.5-flash",  # Deprecated / 404 for new users
-        "gemini-1.5-flash",  # 404 on current endpoint
-        "gemini-1.5-pro",    # 404 on current endpoint
-    ]
+    if client is None:
+        return list(DEFAULT_VISION_MODELS)
 
     discovered = []
     try:
-        print("[SmartCivic AI] Dynamically inspecting available models from Gemini API...")
+        if verbose:
+            print("[SmartCivic AI] Dynamically inspecting available models from Gemini API...")
         models_pager = client.models.list()
         for m in models_pager:
             raw_name = getattr(m, "name", "") or getattr(m, "model", "")
@@ -227,7 +248,7 @@ def get_verified_multimodal_models(client: "genai.Client", verbose: bool = False
                     print(f"  [-] Rejected non-vision/deprecated: {clean_name}")
                 continue
 
-            # Rule 2: Must be a Gemini or Gemma vision model supporting generateContent
+            # Rule 2: Must be a Gemini vision model supporting generateContent
             supported_actions = getattr(m, "supported_actions", None) or getattr(m, "supported_generation_methods", None)
             if supported_actions is not None:
                 if "generateContent" not in supported_actions and "generate_content" not in supported_actions:
@@ -249,47 +270,29 @@ def get_verified_multimodal_models(client: "genai.Client", verbose: bool = False
                 if verbose:
                     print(f"  [+] Valid Vision Candidate: {clean_name}")
 
-        print(f"[SmartCivic AI] Dynamic Model Discovery: {len(discovered)} valid vision model(s) verified.")
-        if discovered:
-            print(f"[SmartCivic AI] Valid Candidates: {', '.join(discovered[:8])}")
+        if verbose:
+            print(f"[SmartCivic AI] Dynamic Model Discovery: {len(discovered)} valid vision model(s) verified.")
     except Exception as e:
-        print(f"[SmartCivic AI] Dynamic query failed ({type(e).__name__}: {e}). Using verified modern defaults.")
+        if verbose:
+            print(f"[SmartCivic AI] Dynamic query failed ({type(e).__name__}: {e}). Using verified modern defaults.")
 
-    # Prioritization Hierarchy:
-    # 1. gemini-3-flash (explicitly recommended by Google Gemini API)
-    # 2. gemini-2.0-flash / gemini-2.0-flash-001 / gemini-2.0-flash-lite
-    # 3. gemini-2.5-pro / gemini-2.0-pro
-    # 4. Other discovered valid vision models
     ranked = []
-    
-    # Priority 1: gemini-3-flash family
+    # Priority 1: gemini-3.6-flash
+    for m in discovered:
+        if "3.6-flash" in m.lower() and m not in ranked:
+            ranked.append(m)
+
+    # Priority 2: gemini-3-flash-preview
     for m in discovered:
         if "3-flash" in m.lower() and m not in ranked:
             ranked.append(m)
 
-    # Priority 2: gemini-2.0-flash family
+    # Priority 3: other flash models (excluding blacklisted)
     for m in discovered:
-        if "2.0-flash" in m.lower() and m not in ranked:
+        if "flash" in m.lower() and m not in ranked and not any(bad in m.lower() for bad in NON_VISION_OR_DEPRECATED):
             ranked.append(m)
 
-    # Priority 3: other flash models (e.g. gemini-3.0, etc. except blacklisted)
-    for m in discovered:
-        if "flash" in m.lower() and m not in ranked:
-            ranked.append(m)
-
-    # Priority 4: pro vision models (e.g. gemini-2.5-pro, gemini-2.0-pro)
-    for m in discovered:
-        if "pro" in m.lower() and m not in ranked:
-            ranked.append(m)
-
-    # Priority 5: any remaining discovered candidate
-    for m in discovered:
-        if m not in ranked:
-            ranked.append(m)
-
-    # Fallback to recommended gemini-3-flash and 2.0-flash if discovery list was empty
-    default_fallbacks = ["gemini-3-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-pro"]
-    for fb in default_fallbacks:
+    for fb in DEFAULT_VISION_MODELS:
         if fb not in ranked:
             ranked.append(fb)
 
@@ -491,17 +494,28 @@ def analyze_civic_issue(
             "message": "AI analysis is currently unavailable (API key not configured). Please configure GEMINI_API_KEY in .streamlit/secrets.toml or select the category manually."
         }
 
-    # Initialize Client
+    # Initialize Client with bounded HTTP timeout (10000ms / 10s)
     try:
         t_client = time.time()
-        client = genai.Client(api_key=api_key)
+        client_http_options = None
+        if hasattr(types, "HttpOptions"):
+            try:
+                # timeout is in milliseconds in google-genai (15000ms = 15s)
+                client_http_options = types.HttpOptions(timeout=15000)
+            except Exception:
+                client_http_options = None
+
+        if client_http_options:
+            client = genai.Client(api_key=api_key, http_options=client_http_options)
+        else:
+            client = genai.Client(api_key=api_key)
         print(f"[SmartCivic AI] Client created successfully (+{time.time()-t_client:.2f}s)")
     except Exception as ce:
         print(f"[SmartCivic AI] Failed to initialize Google GenAI client: {ce}")
         return {
             "success": False,
             "error": "CLIENT_INIT_FAILED",
-            "message": f"Failed to initialize Gemini Client: {ce}. You can select the category manually."
+            "message": "Failed to initialize AI service. You can select the category manually."
         }
 
     # Prepare Image payload
@@ -582,7 +596,7 @@ Guidelines for Severity & Priority Assessment:
         candidate_models = [model_name]
     else:
         configured_override = os.environ.get("GEMINI_MODEL")
-        if configured_override and not any(kw in configured_override.lower() for kw in ["tts", "audio", "2.5-flash"]):
+        if configured_override and not any(kw in configured_override.lower() for kw in NON_VISION_OR_DEPRECATED):
             candidate_models = [configured_override]
         else:
             candidate_models = get_verified_multimodal_models(client)
@@ -591,18 +605,23 @@ Guidelines for Severity & Priority Assessment:
     model_succeeded = ""
     last_error_details = ""
 
-    # Execute with hard thread pool timeout per attempt (max 2 vision models)
+    # Execute with explicit non-blocking thread pool lifecycle per attempt (max 2 vision models)
     for target_model in candidate_models[:2]:
         remaining_time = max(2.0, TOTAL_ANALYSIS_TIMEOUT_SECONDS - (time.time() - t_start))
+        if remaining_time <= 2.0 and target_model != candidate_models[0]:
+            print(f"[SmartCivic AI] Insufficient time budget for fallback '{target_model}'. Aborting.")
+            break
+
         print(f"[SmartCivic AI] Selected verified multimodal model: {target_model}")
         print(f"[SmartCivic AI] Requesting model: {target_model} (Timeout limit: {remaining_time:.1f}s)...")
         print(f"[SmartCivic AI] Multimodal request started")
 
-        try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_execute_gemini_call, client, target_model, image_part, prompt)
-                raw_response_text = future.result(timeout=remaining_time)
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(_execute_gemini_call, client, target_model, image_part, prompt)
 
+        try:
+            raw_response_text = future.result(timeout=remaining_time)
+            executor.shutdown(wait=False, cancel_futures=True)
             if raw_response_text:
                 model_succeeded = target_model
                 print(f"[SmartCivic AI] Response received (+{time.time()-t_start:.2f}s total)")
@@ -610,12 +629,22 @@ Guidelines for Severity & Priority Assessment:
         except concurrent.futures.TimeoutError:
             print(f"[SmartCivic AI] Call to '{target_model}' timed out after {remaining_time:.1f}s!")
             last_error_details = f"Request to '{target_model}' timed out"
+            # Non-blocking shutdown to ensure main thread never blocks
+            try:
+                future.cancel()
+                executor.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                pass
             continue
         except Exception as api_err:
             status_code = getattr(api_err, "code", getattr(api_err, "status_code", "N/A"))
             msg = getattr(api_err, "message", str(api_err))
             print(f"[SmartCivic AI] Error on model '{target_model}': {type(api_err).__name__} (Status: {status_code}) - {msg}")
             last_error_details = f"{type(api_err).__name__} (Status: {status_code}): {msg}"
+            try:
+                executor.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                pass
             continue
 
     # If no response was received
@@ -627,7 +656,7 @@ Guidelines for Severity & Priority Assessment:
         return {
             "success": False,
             "error": "TIMEOUT_OR_API_ERROR",
-            "message": f"AI analysis unavailable ({last_error_details}). You can select the category manually."
+            "message": "AI analysis is temporarily unavailable. Please select the category manually."
         }
 
     # Parse and validate response JSON with deterministic schema validation
