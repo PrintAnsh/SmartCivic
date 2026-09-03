@@ -330,6 +330,10 @@ Capture a photo, let AI classify and triage the problem, and verify location for
                             st.session_state["ai_risk_factors"] = ai_res.get("risk_factors")
                             st.session_state["ai_recommended_action"] = ai_res.get("recommended_action")
                     except Exception as e:
+                        import re
+                        # Sanitize any potential API keys/tokens (long alphanumeric strings)
+                        safe_e = re.sub(r'[A-Za-z0-9_-]{35,}', '[REDACTED_TOKEN]', str(e))
+                        print(f"AI Exception: {type(e).__name__} - {safe_e}", flush=True)
                         st.session_state["ai_status"] = "error"
                         st.session_state["ai_result"] = {
                             "success": False,
