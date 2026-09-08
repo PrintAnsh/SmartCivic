@@ -5,8 +5,7 @@
 SmartCivic is an intelligent civic technology platform engineered to modernize public infrastructure reporting. Moving beyond traditional complaint portals that merely record and forward text, SmartCivic introduces an automated intelligence layer that analyzes visual evidence using multimodal AI, calculates dynamic priority urgency, clusters duplicate reports within geographic proximity, assigns responsible municipal departments, and tracks resolution through verifiable Before/After evidence.
 
 > **Smart India Hackathon 2026**  
-> **Project:** Smart Civic Issue Reporting Platform  
-> **Intern ID:** CITS7491  
+> **Project:** Smart Civic Issue Reporting Platform   
 > **Core Message:** *“Every civic issue deserves the right attention, from the right department, at the right time.”*
 
 ---
