@@ -935,6 +935,27 @@ def inject_custom_css():
             border-left: 3px solid #F59E0B;
             padding: 1rem 1.2rem;
             margin-bottom: 1.5rem;
+        /* Geotag Verification Badges */
+        .geotag-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 3px;
+            background: rgba(16, 185, 129, 0.12);
+            color: #34D399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            margin-top: 5px;
+        }
+
+        .geotag-badge-evidence {
+            background: rgba(196, 93, 99, 0.12);
+            color: #E2848A;
+            border: 1px solid rgba(196, 93, 99, 0.3);
         }
         </style>
         """,

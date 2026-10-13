@@ -229,6 +229,10 @@ SmartCivic embeds spatial intelligence throughout the citizen and administrative
    - **Heatmap Layer**: An optional density heatmap weighted by incident priority score, highlighting urban problem clusters.
    - **Interactive Tooltips**: Hover tooltips displaying Complaint ID, Category, Severity, Priority, Address, and Status.
    - **Multi-Factor Filters**: Filter map points by Category, Severity, and Status simultaneously.
+4. **Automated Image Geotagging & Verification (`utils/geotag.py`)**:
+   - **EXIF GPS Metadata Extraction**: Uploaded smartphone photos are scanned for embedded EXIF GPS tags; if detected, coordinates and street addresses are automatically extracted and populated.
+   - **Visual Geotag Watermark Stamping**: Citizen evidence photos and municipal field repair photos are stamped with a tamper-evident visual watermark overlay containing verified GPS coordinates, reverse-geocoded address, timestamp, complaint ID, and category.
+   - **EXIF GPS Metadata Embedding**: Standardized EXIF GPS tags (`GPSLatitude`, `GPSLongitude`, `GPSDateStamp`, `GPSTimeStamp`) are written into saved JPEG headers for interoperability with municipal GIS archives.
 
 ---
 

@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from PIL import Image
 
+from utils.geotag import geotag_and_save_image
+
 
 def get_persistent_storage_dir() -> Path:
     """
@@ -169,9 +171,18 @@ def save_all_complaints(complaints: List[Dict[str, Any]]) -> bool:
         return False
 
 
-def save_complaint_image(complaint_id: str, image_obj: Any) -> Optional[str]:
+def save_complaint_image(
+    complaint_id: str,
+    image_obj: Any,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    location_text: Optional[str] = None,
+    timestamp: Optional[str] = None,
+    category: Optional[str] = None
+) -> Optional[str]:
     """
     Saves an attached PIL Image or image buffer to %LOCALAPPDATA%/SmartCivic/data/images/{complaint_id}.jpg.
+    Applies visual geotag watermark stamp and embeds EXIF GPS tags.
     Returns project-relative path (data/images/{complaint_id}.jpg).
     """
     if image_obj is None:
@@ -182,6 +193,24 @@ def save_complaint_image(complaint_id: str, image_obj: Any) -> Optional[str]:
     filename = f"{complaint_id}.jpg"
     image_path = IMAGES_DIR / filename
 
+    try:
+        ok = geotag_and_save_image(
+            image_obj=image_obj,
+            output_path=image_path,
+            latitude=latitude,
+            longitude=longitude,
+            location_text=location_text,
+            timestamp=timestamp,
+            complaint_id=complaint_id,
+            category=category,
+            tag_type="CITIZEN EVIDENCE"
+        )
+        if ok and image_path.exists():
+            return f"data/images/{filename}"
+    except Exception as e:
+        print(f"[SmartCivic Storage] Geotagging error, falling back to standard save: {e}")
+
+    # Fallback to standard save if geotagging encountered any issue
     try:
         if isinstance(image_obj, Image.Image):
             rgb_img = image_obj.convert("RGB") if image_obj.mode != "RGB" else image_obj
@@ -202,10 +231,19 @@ def save_complaint_image(complaint_id: str, image_obj: Any) -> Optional[str]:
     return None
 
 
-def save_resolution_image(complaint_id: str, image_obj: Any) -> Optional[str]:
+def save_resolution_image(
+    complaint_id: str,
+    image_obj: Any,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    location_text: Optional[str] = None,
+    timestamp: Optional[str] = None,
+    category: Optional[str] = None
+) -> Optional[str]:
     """
     Saves a municipal resolution proof image (After repair photo)
     to %LOCALAPPDATA%/SmartCivic/data/images/RESOLVED-{complaint_id}.jpg.
+    Applies visual geotag watermark stamp and embeds EXIF GPS tags.
     Returns project-relative path (data/images/RESOLVED-{complaint_id}.jpg).
     """
     if image_obj is None:
@@ -216,6 +254,24 @@ def save_resolution_image(complaint_id: str, image_obj: Any) -> Optional[str]:
     filename = f"RESOLVED-{complaint_id}.jpg"
     image_path = IMAGES_DIR / filename
 
+    try:
+        ok = geotag_and_save_image(
+            image_obj=image_obj,
+            output_path=image_path,
+            latitude=latitude,
+            longitude=longitude,
+            location_text=location_text,
+            timestamp=timestamp,
+            complaint_id=complaint_id,
+            category=category,
+            tag_type="MUNICIPAL RESOLUTION PROOF"
+        )
+        if ok and image_path.exists():
+            return f"data/images/{filename}"
+    except Exception as e:
+        print(f"[SmartCivic Storage] Geotagging resolution error, falling back: {e}")
+
+    # Fallback to standard save
     try:
         if isinstance(image_obj, Image.Image):
             rgb_img = image_obj.convert("RGB") if image_obj.mode != "RGB" else image_obj
@@ -246,12 +302,28 @@ def save_complaint(record: Dict[str, Any]) -> Dict[str, Any]:
 
     # Save intake image to disk if present as a PIL object
     if "image" in record and record["image"] is not None and not record.get("image_path"):
-        img_path = save_complaint_image(complaint_id, record["image"])
+        img_path = save_complaint_image(
+            complaint_id=complaint_id,
+            image_obj=record["image"],
+            latitude=record.get("latitude"),
+            longitude=record.get("longitude"),
+            location_text=record.get("location_text"),
+            timestamp=record.get("timestamp"),
+            category=record.get("category")
+        )
         record["image_path"] = img_path
 
     # Save resolution proof image if present
     if "resolution_image" in record and record["resolution_image"] is not None and not record.get("resolution_image_path"):
-        res_img_path = save_resolution_image(complaint_id, record["resolution_image"])
+        res_img_path = save_resolution_image(
+            complaint_id=complaint_id,
+            image_obj=record["resolution_image"],
+            latitude=record.get("latitude"),
+            longitude=record.get("longitude"),
+            location_text=record.get("location_text"),
+            timestamp=record.get("resolution_timestamp") or record.get("timestamp"),
+            category=record.get("category")
+        )
         record["resolution_image_path"] = res_img_path
 
     # Ensure status history exists
@@ -318,7 +390,15 @@ def update_complaint_status(
             if new_status == "RESOLVED":
                 c["resolution_timestamp"] = now_str
                 if resolution_image is not None:
-                    res_path = save_resolution_image(complaint_id, resolution_image)
+                    res_path = save_resolution_image(
+                        complaint_id=complaint_id,
+                        image_obj=resolution_image,
+                        latitude=c.get("latitude"),
+                        longitude=c.get("longitude"),
+                        location_text=c.get("location_text"),
+                        timestamp=now_str,
+                        category=c.get("category")
+                    )
                     if res_path:
                         c["resolution_image_path"] = res_path
 

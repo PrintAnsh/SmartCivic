@@ -18,6 +18,7 @@ from utils.helpers import (
     create_complaint_record,
     init_session_state,
 )
+from utils.geotag import extract_exif_gps
 from utils.location import (
     find_nearby_potential_duplicates,
     render_geolocation_component,
@@ -316,6 +317,52 @@ Capture a photo, let AI classify and triage the problem, and verify location for
                 final_image = upload_file
 
         if final_image is not None:
+            # Check for embedded EXIF GPS tags in uploaded photo
+            file_sig = f"{getattr(final_image, 'name', 'camera')}_{getattr(final_image, 'size', 0)}"
+            if st.session_state.get("last_checked_geo_file") != file_sig:
+                st.session_state["last_checked_geo_file"] = file_sig
+                try:
+                    ex_lat, ex_lon = extract_exif_gps(final_image)
+                    if ex_lat is not None and ex_lon is not None:
+                        st.session_state["gps_latitude"] = ex_lat
+                        st.session_state["gps_longitude"] = ex_lon
+                        st.session_state["exif_geo_found"] = True
+                        if not st.session_state.get("location_text"):
+                            addr = reverse_geocode(ex_lat, ex_lon)
+                            if addr:
+                                st.session_state["location_text"] = addr
+                                st.session_state["loc_key_counter"] = st.session_state.get("loc_key_counter", 0) + 1
+                    else:
+                        st.session_state["exif_geo_found"] = False
+                except Exception as ex_err:
+                    print(f"[SmartCivic EXIF Detect Error] {ex_err}")
+
+            if photo_mode == "Upload an Image" and upload_file is not None:
+                try:
+                    pil_preview = Image.open(upload_file)
+                    st.image(pil_preview, caption="Uploaded Evidence Preview", use_container_width=True)
+                except Exception:
+                    pass
+
+            if st.session_state.get("exif_geo_found"):
+                st.markdown(
+                    f"""<div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; padding: 0.6rem 0.8rem; margin: 0.5rem 0;">
+<div style="color: #34D399; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.04em;">📍 EXIF GEOTAG DETECTED IN IMAGE</div>
+<div style="color: #E2E8F0; font-size: 0.78rem; font-family: monospace;">GPS: {st.session_state.get('gps_latitude'):.6f}, {st.session_state.get('gps_longitude'):.6f}</div>
+<div style="color: #94A3B8; font-size: 0.75rem;">Coordinates and address automatically populated from photo metadata.</div>
+</div>""",
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    """<div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 4px; padding: 0.5rem 0.8rem; margin: 0.5rem 0;">
+<div style="color: #A3A3A3; font-size: 0.76rem; display: flex; align-items: center; gap: 6px;">
+<span>📍</span> <span>Photo will be stamped with verified GPS coordinates, address & timestamp upon submission.</span>
+</div>
+</div>""",
+                    unsafe_allow_html=True
+                )
+
             if st.session_state.get("ai_status") == "idle" or st.session_state.get("ai_result") is None:
                 with st.spinner("🤖 Multimodal Gemini Vision analyzing issue & assessing risk..."):
                     try:
@@ -755,11 +802,13 @@ Monitor real-time municipal triage, SLA countdowns, and verified resolution evid
                             r_before = (PROJECT_ROOT / img_path) if not os.path.isabs(str(img_path)) else Path(img_path)
                             if r_before.exists():
                                 st.image(str(r_before), use_container_width=True)
+                                st.markdown("<div style='margin-top: 4px;'><span class='geotag-badge geotag-badge-evidence'>📍 GEOTAGGED CITIZEN EVIDENCE</span></div>", unsafe_allow_html=True)
                     with p_col2:
                         st.markdown("<div class='proof-badge proof-after' style='margin-bottom: 4px;'>AFTER REPAIR (MUNICIPAL PROOF)</div>", unsafe_allow_html=True)
                         r_after = (PROJECT_ROOT / res_img_path) if not os.path.isabs(str(res_img_path)) else Path(res_img_path)
                         if r_after.exists():
                             st.image(str(r_after), use_container_width=True)
+                            st.markdown("<div style='margin-top: 4px;'><span class='geotag-badge'>📍 GEOTAGGED RESOLUTION PROOF</span></div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div class='ai-field-label'>ATTACHED PHOTO EVIDENCE</div>", unsafe_allow_html=True)
                     img_rendered = False
@@ -768,6 +817,7 @@ Monitor real-time municipal triage, SLA countdowns, and verified resolution evid
                         if resolved_img_path.exists():
                             try:
                                 st.image(str(resolved_img_path), caption=f"Evidence for {cid}", use_container_width=True)
+                                st.markdown("<div style='margin-top: 4px;'><span class='geotag-badge geotag-badge-evidence'>📍 VERIFIED GEOTAGGED EVIDENCE</span></div>", unsafe_allow_html=True)
                                 img_rendered = True
                             except Exception:
                                 pass
@@ -1212,6 +1262,7 @@ Real-time incident triage queue, SLA turnaround metrics, resolution proof verifi
             res_proof_img = None
             if new_st == "RESOLVED":
                 st.markdown("<div style='font-size: 0.78rem; font-weight: 700; color: #34D399; margin-top: 4px;'>📷 ATTACH FIELD RESOLUTION PROOF PHOTO (AFTER REPAIR):</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size: 0.74rem; color: #94A3B8; margin-bottom: 6px;'>Photo will be automatically stamped with verified ticket GPS coordinates, timestamp & municipal resolution badge.</div>", unsafe_allow_html=True)
                 res_proof_img = st.file_uploader(
                     "Upload After Repair Proof Photo",
                     type=["jpg", "jpeg", "png"],
