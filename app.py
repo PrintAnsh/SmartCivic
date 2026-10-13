@@ -86,6 +86,7 @@ def render_top_navigation():
             """<div class="nav-logo">
 <span class="nav-logo-dot"></span>
 <span>SMARTCIVIC</span>
+<span class="nav-status-chip"><span class="pulse-dot"></span> LIVE</span>
 </div>""",
             unsafe_allow_html=True
         )
@@ -120,7 +121,7 @@ def render_top_navigation():
         if st.button("About", key="nav_btn_about", type=btn_type, use_container_width=True):
             set_page("About")
 
-    st.markdown("<hr style='border: none; border-top: 1px solid #1A1A1A; margin: 1rem 0 2.5rem 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='border: none; border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 0.8rem 0 2.2rem 0;'>", unsafe_allow_html=True)
 
 
 def render_home():
@@ -206,27 +207,28 @@ Select an issue type below to initiate a structured report:
         unsafe_allow_html=True
     )
 
-    # Interactive Issue Types Grid
-    cat_col1, cat_col2 = st.columns(2, gap="medium")
+    # Interactive Issue Types Grid (Bento layout)
+    cat_col1, cat_col2, cat_col3 = st.columns(3, gap="medium")
 
     with cat_col1:
-        if st.button("01. Road & Potholes  →", key="cat_btn_1", type="secondary", use_container_width=True):
+        if st.button("🛣️ Road & Potholes →", key="cat_btn_1", type="secondary", use_container_width=True):
             set_page("Report an Issue", preselected_category="Pothole / Road Damage")
-        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-        if st.button("02. Garbage & Waste  →", key="cat_btn_2", type="secondary", use_container_width=True):
-            set_page("Report an Issue", preselected_category="Garbage & Waste")
-        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-        if st.button("03. Streetlights  →", key="cat_btn_3", type="secondary", use_container_width=True):
-            set_page("Report an Issue", preselected_category="Streetlight")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        if st.button("💧 Water & Leakage →", key="cat_btn_4", type="secondary", use_container_width=True):
+            set_page("Report an Issue", preselected_category="Water Leakage")
 
     with cat_col2:
-        if st.button("04. Water & Leakage  →", key="cat_btn_4", type="secondary", use_container_width=True):
-            set_page("Report an Issue", preselected_category="Water Leakage")
-        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-        if st.button("05. Drainage & Sewage  →", key="cat_btn_5", type="secondary", use_container_width=True):
+        if st.button("🗑️ Garbage & Waste →", key="cat_btn_2", type="secondary", use_container_width=True):
+            set_page("Report an Issue", preselected_category="Garbage & Waste")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        if st.button("🚰 Drainage & Sewage →", key="cat_btn_5", type="secondary", use_container_width=True):
             set_page("Report an Issue", preselected_category="Drainage & Sewage")
-        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-        if st.button("06. Public Infrastructure  →", key="cat_btn_6", type="secondary", use_container_width=True):
+
+    with cat_col3:
+        if st.button("💡 Street Lighting →", key="cat_btn_3", type="secondary", use_container_width=True):
+            set_page("Report an Issue", preselected_category="Streetlight")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        if st.button("🏛️ Public Infrastructure →", key="cat_btn_6", type="secondary", use_container_width=True):
             set_page("Report an Issue", preselected_category="Public Infrastructure")
 
 
@@ -399,22 +401,34 @@ Capture a photo, let AI classify and triage the problem, and verify location for
             risks_html = "".join([f"<li>{r}</li>" for r in ai_res.get("risk_factors", [])])
 
             st.markdown(
-                f"""<div class="ai-assessment-card">
-<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem;">
-<span class="ai-title">🤖 AI MULTIMODAL TRIAGE</span>
+                f"""<div class="ai-result-card">
+<div class="ai-card-eyebrow">
+<span class="ai-card-label"><span>🤖</span> AI MULTIMODAL TRIAGE</span>
 <span class="ai-confidence-badge">{conf_str} Confidence</span>
 </div>
-<div style="font-size: 1.15rem; font-weight: 700; color: #FFF; margin-bottom: 0.4rem;">{cat}</div>
-<div style="margin-bottom: 0.8rem;">
+<div class="ai-category-title">{cat}</div>
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0.8rem; flex-wrap: wrap;">
 <span class="ai-severity-badge {sev_cls}">{sev} SEVERITY</span>
-<span style="font-family: monospace; color: #E5E5E5; margin-left: 8px; font-weight: 700;">Priority Score: {prio}/100</span>
+<div class="ai-priority-metric">
+<span class="ai-priority-val">{prio}</span>
+<span class="ai-priority-max">/100 Priority</span>
 </div>
+</div>
+<div class="ai-priority-bar-bg">
+<div class="ai-priority-bar-fill" style="width: {min(100, max(5, prio))}%; background: linear-gradient(90deg, #10B981, #F59E0B, #EF4444);"></div>
+</div>
+<div class="ai-detail-block">
 <div class="ai-field-label">AI SUMMARY</div>
-<div style="font-size: 0.85rem; color: #CCC; margin-bottom: 0.6rem; line-height: 1.4;">{ai_res.get('summary', 'N/A')}</div>
+<div class="ai-field-value">{ai_res.get('summary', 'N/A')}</div>
+</div>
+<div class="ai-detail-block">
 <div class="ai-field-label">OBSERVED RISK FACTORS</div>
-<ul style="margin: 0 0 0.8rem 1.2rem; padding: 0; font-size: 0.82rem; color: #BBB;">{risks_html}</ul>
+<ul style="margin: 0.3rem 0 0.5rem 1.2rem; padding: 0; font-size: 0.84rem; color: #CBD5E1;">{risks_html}</ul>
+</div>
+<div class="ai-detail-block">
 <div class="ai-field-label">RECOMMENDED ACTION</div>
-<div style="font-size: 0.85rem; color: #10B981; line-height: 1.4;">{ai_res.get('recommended_action', 'N/A')}</div>
+<div class="ai-recommended-box">{ai_res.get('recommended_action', 'N/A')}</div>
+</div>
 </div>""",
                 unsafe_allow_html=True
             )
@@ -573,6 +587,7 @@ Submitting will link your report to increase municipal triage urgency.
 def render_stepper_html(current_status: str) -> str:
     """
     Renders an HTML lifecycle progress stepper showing complaint transition states.
+    Inspired by reui/stepper from awesome-components.
     """
     steps = [
         ("SUBMITTED", "Submitted"),
@@ -587,7 +602,7 @@ def render_stepper_html(current_status: str) -> str:
     if current_status == "REJECTED":
         return """<div class="stepper-container" style="border-left: 3px solid #EF4444;">
 <span class="status-badge status-rejected" style="font-size: 0.8rem; padding: 4px 10px;">REJECTED / CLOSED</span>
-<span style="font-size: 0.82rem; color: #888; margin-left: 12px;">This complaint has been reviewed and marked as non-actionable or duplicate.</span>
+<span style="font-size: 0.82rem; color: var(--text-secondary); margin-left: 12px;">This complaint has been reviewed and marked as non-actionable or duplicate.</span>
 </div>"""
 
     steps_html = []
@@ -606,6 +621,9 @@ def render_stepper_html(current_status: str) -> str:
 <div class="stepper-dot">{dot_content}</div>
 <div class="stepper-label">{label}</div>
 </div>""")
+        if i < len(steps) - 1:
+            sep_cls = "completed" if i < current_idx else ""
+            steps_html.append(f"""<div class="stepper-separator {sep_cls}"></div>""")
 
     return f"""<div class="stepper-container">
 {"".join(steps_html)}
@@ -633,9 +651,10 @@ Monitor real-time municipal triage, SLA countdowns, and verified resolution evid
 
     if not complaints_list:
         st.markdown(
-            """<div style="border: 1px solid #1A1A1A; padding: 3.5rem 2rem; text-align: center; margin-bottom: 2rem; background: #080808;">
-<div style="font-size: 1.2rem; font-weight: 700; color: #EBEBEB; margin-bottom: 0.4rem;">Nothing here yet.</div>
-<div style="font-size: 0.9rem; color: #888888; margin-bottom: 1.5rem;">Your submitted civic reports will appear here.</div>
+            """<div style="border: 1px solid var(--border-subtle); padding: 3.5rem 2rem; text-align: center; margin-bottom: 2rem; background: var(--bg-card); border-radius: var(--radius-lg); backdrop-filter: blur(14px);">
+<div style="font-size: 2.2rem; margin-bottom: 0.6rem;">📋</div>
+<div style="font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.4rem;">No Citizen Reports Logged Yet</div>
+<div style="font-size: 0.92rem; color: var(--text-secondary); margin-bottom: 1.5rem;">Submitted municipal complaints will be tracked here in real-time.</div>
 </div>""",
             unsafe_allow_html=True
         )
@@ -1319,17 +1338,17 @@ geospatial clustering, and data analytics.
 
     with col_about_meta:
         st.markdown(
-            """<div style="border: 1px solid #1A1A1A; padding: 1.5rem; background: #080808;">
-<div style="font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #B15258; margin-bottom: 0.5rem;">
+            """<div style="border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 1.5rem; background: var(--bg-card); backdrop-filter: blur(14px); box-shadow: var(--glow-card);">
+<div style="font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-primary-hover); margin-bottom: 0.6rem;">
 PROJECT SPECIFICATIONS
 </div>
-<div style="font-size: 0.88rem; color: #888888; line-height: 1.6;">
-Release: <strong>v0.5 GIS & SLA Engine</strong><br>
-AI Vision: <strong>Google Gemini Flash Multimodal</strong><br>
-Triage: <strong>Severity + Priority + Risk Assessment</strong><br>
-Geospatial: <strong>PyDeck Scatter & Heatmap GIS</strong><br>
-Operations: <strong>SLA Timers + Resolution Proof</strong><br>
-Context: <strong>Smart India Hackathon</strong>
+<div style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.7;">
+Release: <strong style="color: #FFF;">v0.5 GIS & SLA Engine</strong><br>
+AI Vision: <strong style="color: #A5B4FC;">Google Gemini Flash Multimodal</strong><br>
+Triage: <strong style="color: #FFF;">Severity + Priority + Risk Assessment</strong><br>
+Geospatial: <strong style="color: #38BDF8;">PyDeck Scatter & Heatmap GIS</strong><br>
+Operations: <strong style="color: #34D399;">SLA Timers + Resolution Proof</strong><br>
+Context: <strong style="color: #FFF;">Smart India Hackathon</strong>
 </div>
 </div>""",
             unsafe_allow_html=True
