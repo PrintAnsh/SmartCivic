@@ -25,12 +25,17 @@ def extract_exif_gps(image_obj: Any) -> Tuple[Optional[float], Optional[float]]:
         elif isinstance(image_obj, (str, Path)):
             pil_img = Image.open(str(image_obj))
             should_close = True
-        elif hasattr(image_obj, "read"):
-            pos = image_obj.tell() if hasattr(image_obj, "tell") else None
-            pil_img = Image.open(image_obj)
+        elif hasattr(image_obj, "getvalue"):
+            data = image_obj.getvalue()
+            pil_img = Image.open(io.BytesIO(data))
             should_close = True
-            if hasattr(image_obj, "seek") and pos is not None:
+        elif hasattr(image_obj, "read"):
+            pos = image_obj.tell() if hasattr(image_obj, "tell") else 0
+            data = image_obj.read()
+            if hasattr(image_obj, "seek"):
                 image_obj.seek(pos)
+            pil_img = Image.open(io.BytesIO(data))
+            should_close = True
         else:
             return None, None
 
@@ -261,11 +266,14 @@ def geotag_and_save_image(
         # Open image
         if isinstance(image_obj, Image.Image):
             base_img = image_obj.copy()
+        elif hasattr(image_obj, "getvalue"):
+            base_img = Image.open(io.BytesIO(image_obj.getvalue()))
         elif hasattr(image_obj, "read"):
-            pos = image_obj.tell() if hasattr(image_obj, "tell") else None
-            base_img = Image.open(image_obj)
-            if hasattr(image_obj, "seek") and pos is not None:
+            pos = image_obj.tell() if hasattr(image_obj, "tell") else 0
+            data = image_obj.read()
+            if hasattr(image_obj, "seek"):
                 image_obj.seek(pos)
+            base_img = Image.open(io.BytesIO(data))
         else:
             return False
 

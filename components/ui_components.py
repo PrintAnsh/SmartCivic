@@ -119,6 +119,8 @@ def inject_custom_css():
             height: 100%;
             padding-top: 0.25rem;
             text-transform: uppercase;
+            white-space: nowrap !important;
+            min-width: max-content !important;
         }
 
         .nav-logo-dot {
@@ -145,6 +147,7 @@ def inject_custom_css():
             color: #34D399;
             border: 1px solid rgba(16, 185, 129, 0.3);
             margin-left: 4px;
+            white-space: nowrap !important;
         }
 
         .pulse-dot {
@@ -162,17 +165,80 @@ def inject_custom_css():
         }
 
         /* ==========================================================================
+           TOP NAVIGATION BAR & PILLS (from awesome-components nav-pills)
+           ========================================================================== */
+        div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-nav_btn_"]) {
+            align-items: center !important;
+            gap: 0.45rem !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            flex-wrap: nowrap !important;
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+            padding: 0.25rem 0.1rem 0.5rem 0.1rem !important;
+        }
+
+        div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-nav_btn_"])::-webkit-scrollbar {
+            display: none !important;
+        }
+
+        div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-nav_btn_"]) > div[data-testid="stColumn"] {
+            min-width: max-content !important;
+            flex: 1 0 auto !important;
+        }
+
+        div[class*="st-key-nav_btn_"] {
+            width: 100% !important;
+            min-width: max-content !important;
+        }
+
+        div[class*="st-key-nav_btn_"] > button {
+            padding: 0.45rem 0.75rem !important;
+            font-size: 0.82rem !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.01em !important;
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+            min-height: 2.25rem !important;
+            height: 2.25rem !important;
+            line-height: 1 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            border-radius: var(--radius-sm) !important;
+        }
+
+        div[class*="st-key-nav_btn_"] > button p,
+        div[class*="st-key-nav_btn_"] > button div,
+        div[class*="st-key-nav_btn_"] > button span {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+            font-size: 0.82rem !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* ==========================================================================
            BUTTONS & MICRO-INTERACTIONS (from aliimam/button-soft-glow & app.css)
            ========================================================================== */
         .stButton > button {
             border-radius: var(--radius-md) !important;
             font-weight: 600 !important;
             letter-spacing: 0.02em !important;
-            padding: 0.6rem 1.25rem !important;
+            padding: 0.55rem 1.1rem !important;
             transition: all var(--transition-fast) !important;
             font-family: var(--font-body) !important;
             border: 1px solid transparent !important;
-            font-size: 0.9rem !important;
+            font-size: 0.88rem !important;
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+        }
+
+        .stButton > button p,
+        .stButton > button div {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
         }
 
         /* Primary Button: Vibrant Civic Crimson with Soft Glow */

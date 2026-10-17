@@ -75,8 +75,9 @@ def render_top_navigation():
     Renders an interactive minimal editorial top navigation bar with v0.5 GIS Map.
     """
     nav_col1, nav_col2, nav_col3, nav_col4, nav_col5, nav_col6, nav_col7 = st.columns(
-        [2.2, 0.9, 1.4, 0.9, 1.1, 1.7, 0.9],
-        gap="small"
+        [1.6, 0.85, 1.4, 0.85, 1.0, 1.6, 0.85],
+        gap="small",
+        vertical_alignment="center"
     )
 
     current = st.session_state.get("page", "Home")
@@ -341,6 +342,8 @@ Capture a photo, let AI classify and triage the problem, and verify location for
 
             if photo_mode == "Upload an Image" and upload_file is not None:
                 try:
+                    if hasattr(upload_file, "seek"):
+                        upload_file.seek(0)
                     pil_preview = Image.open(upload_file)
                     st.image(pil_preview, caption="Uploaded Evidence Preview", use_container_width=True)
                 except Exception:
@@ -368,6 +371,8 @@ Capture a photo, let AI classify and triage the problem, and verify location for
             if st.session_state.get("ai_status") == "idle" or st.session_state.get("ai_result") is None:
                 with st.spinner("🤖 Multimodal Gemini Vision analyzing issue & assessing risk..."):
                     try:
+                        if hasattr(final_image, "seek"):
+                            final_image.seek(0)
                         pil_img = Image.open(final_image)
                         ai_res = analyze_civic_issue(pil_img)
                         st.session_state["ai_result"] = ai_res
@@ -550,6 +555,8 @@ Submitting will link your report to increase municipal triage urgency.
             st.error(f"⚠️ Incomplete submission. Please provide: {', '.join(missing)}")
         else:
             try:
+                if hasattr(final_image, "seek"):
+                    final_image.seek(0)
                 img_obj = Image.open(final_image)
                 ai_data = st.session_state.get("ai_result") if (st.session_state.get("ai_result") and st.session_state.get("ai_result").get("success")) else None
 
